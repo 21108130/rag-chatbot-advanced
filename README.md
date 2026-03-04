@@ -75,7 +75,7 @@ ChatResponse            Answer + sources + confidence + latency
 ### 1. Clone & Install
 
 ```bash
-git clone https://github.com/yourusername/rag-chatbot-v3.git
+git clone https://github.com/21108130/rag-chatbot-advanced
 cd rag-chatbot-v3
 pip install -r requirements.txt
 ```
