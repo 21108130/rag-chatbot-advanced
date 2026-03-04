@@ -1,13 +1,12 @@
-
 from __future__ import annotations
 
 import secrets
 import hashlib
+import bcrypt
 from datetime import datetime, timedelta
 from typing import Optional
 from uuid import uuid4
 
-from passlib.context import CryptContext
 from jose import JWTError, jwt
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
@@ -20,8 +19,6 @@ SECRET_KEY    = secrets.token_urlsafe(32)
 ALGORITHM     = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 
 class AuthManager:
 
@@ -33,17 +30,15 @@ class AuthManager:
         logger.info(f"[Auth] Database ready at {db_url}")
 
 
-
     def get_db(self) -> Session:
         return self.SessionLocal()
 
 
-
     def hash_password(self, password: str) -> str:
-        return pwd_context.hash(password)
+        return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
     def verify_password(self, plain: str, hashed: str) -> bool:
-        return pwd_context.verify(plain, hashed)
+        return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
 
 
     def create_access_token(
@@ -66,7 +61,6 @@ class AuthManager:
             return None
 
 
-
     def create_user(
         self,
         username: str,
@@ -75,7 +69,6 @@ class AuthManager:
     ) -> User:
         db = self.get_db()
         try:
-
             if db.query(User).filter(User.username == username).first():
                 raise ValueError(f"Username '{username}' already taken.")
             if db.query(User).filter(User.email == email).first():
@@ -127,7 +120,6 @@ class AuthManager:
 
 
     def create_api_key(self, user_id: str, name: str) -> str:
-
         raw_key  = f"rag_{secrets.token_urlsafe(32)}"
         key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
 
@@ -147,7 +139,6 @@ class AuthManager:
             db.close()
 
     def validate_api_key(self, raw_key: str) -> Optional[User]:
-
         key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
         db = self.get_db()
         try:
@@ -162,7 +153,6 @@ class AuthManager:
             return self.get_user_by_id(api_key.user_id)
         finally:
             db.close()
-
 
 
 _auth_manager: Optional[AuthManager] = None
