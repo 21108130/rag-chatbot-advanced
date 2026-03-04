@@ -23,15 +23,16 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 class AuthManager:
 
 
-    def __init__(self, db_url: str = "sqlite:////tmp/users.db") -> None:
+    def __init__(self, db_url: str = "sqlite:////tmp/rag_users.db") -> None:
         import os
-        # Auto-create directory if using a file-based SQLite path
-        if db_url.startswith("sqlite:///"):
-            db_path = db_url.replace("sqlite:///", "").lstrip("/")
-            if not db_url.startswith("sqlite:////tmp"):
-                db_dir = os.path.dirname(db_path)
-                if db_dir:
-                    os.makedirs(db_dir, exist_ok=True)
+        # Always use /tmp on Streamlit Cloud (only guaranteed writable dir)
+        # If caller passes a ./data/... path, redirect to /tmp automatically
+        if "data/users.db" in db_url or db_url == "sqlite:///./data/users.db":
+            db_url = "sqlite:////tmp/rag_users.db"
+        elif db_url.startswith("sqlite:///") and not db_url.startswith("sqlite:////tmp"):
+            db_path = db_url.replace("sqlite:///./", "").replace("sqlite:///", "")
+            db_dir  = os.path.dirname(os.path.abspath(db_path))
+            os.makedirs(db_dir, exist_ok=True)
         self.engine        = create_engine(db_url, connect_args={"check_same_thread": False})
         self.SessionLocal  = sessionmaker(bind=self.engine)
         Base.metadata.create_all(self.engine)
@@ -105,9 +106,14 @@ class AuthManager:
             if not user or not self.verify_password(password, user.hashed_password):
                 logger.warning(f"[Auth] Failed login attempt for: {username}")
                 return None
-            user.last_login = datetime.utcnow()
-            db.commit()
-            db.refresh(user)
+            # Update last_login — non-critical, ignore failures
+            try:
+                user.last_login = datetime.utcnow()
+                db.commit()
+                db.refresh(user)
+            except Exception as e:
+                db.rollback()
+                logger.warning(f"[Auth] Could not update last_login: {e}")
             logger.info(f"[Auth] Successful login: {username}")
             return user
         finally:
