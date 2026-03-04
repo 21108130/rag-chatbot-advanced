@@ -23,7 +23,15 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 class AuthManager:
 
 
-    def __init__(self, db_url: str = "sqlite:///./data/users.db") -> None:
+    def __init__(self, db_url: str = "sqlite:////tmp/users.db") -> None:
+        import os
+        # Auto-create directory if using a file-based SQLite path
+        if db_url.startswith("sqlite:///"):
+            db_path = db_url.replace("sqlite:///", "").lstrip("/")
+            if not db_url.startswith("sqlite:////tmp"):
+                db_dir = os.path.dirname(db_path)
+                if db_dir:
+                    os.makedirs(db_dir, exist_ok=True)
         self.engine        = create_engine(db_url, connect_args={"check_same_thread": False})
         self.SessionLocal  = sessionmaker(bind=self.engine)
         Base.metadata.create_all(self.engine)
